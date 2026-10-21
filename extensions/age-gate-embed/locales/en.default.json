@@ -1,0 +1,23 @@
+{
+  "ageGate": {
+    "name": "Age Guard Storefront Gate",
+    "restricted_tag": {
+      "label": "Restricted product tag"
+    },
+    "minimum_age": {
+      "label": "Minimum age"
+    },
+    "popup_title": {
+      "label": "Popup title"
+    },
+    "popup_message": {
+      "label": "Popup message"
+    },
+    "confirm_text": {
+      "label": "Confirm button text"
+    },
+    "deny_text": {
+      "label": "Deny button text"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "payload": {
+    "export": "cart-validations-generate-run",
+    "target": "cart.validations.generate.run",
+    "input": {
+      "cart": {
+        "lines": [
+          {
+            "quantity": 3
+          }
+        ]
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          validationAdd: {
+            errors: [
+              {
+                "message": "This cart contains age-restricted items. Please verify your age to proceed.",
+                "target": "$.cart"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

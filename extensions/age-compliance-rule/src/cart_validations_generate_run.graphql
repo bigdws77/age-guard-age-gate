@@ -1,0 +1,18 @@
+query RunInput {
+  cart {
+    attribute(key: "age_verified") {
+      key
+      value
+    }
+    lines {
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          product {
+            hasAnyTag(tags: ["age-restricted"])
+          }
+        }
+      }
+    }
+  }
+}

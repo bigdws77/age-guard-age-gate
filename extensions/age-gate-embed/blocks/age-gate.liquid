@@ -1,0 +1,245 @@
+{% comment %}
+  Age Guard Storefront Gate
+  - Shows an age verification modal on restricted product pages and cart pages
+  - Hides dynamic checkout buttons ("Buy it now", Shop Pay, Apple Pay, etc.) on restricted products
+  - Shows a helpful message in place of the hidden button
+{% endcomment %}
+
+{%- assign restricted_tag = block.settings.restricted_tag | default: 'age-restricted' -%}
+{%- assign min_age = block.settings.minimum_age | default: 21 -%}
+{%- assign popup_title = block.settings.popup_title | default: 'Age Verification Required' -%}
+{%- assign popup_message = block.settings.popup_message | default: 'You must be 21 or older to purchase age-restricted products. Please confirm your age to continue.' -%}
+{%- assign confirm_text = block.settings.confirm_text | default: 'I am 21 or older' -%}
+{%- assign deny_text = block.settings.deny_text | default: 'I am under 21' -%}
+{%- assign info_message = block.settings.info_message | default: 'Age verification is required for this product. Please add it to your cart to continue.' -%}
+
+{%- assign show_gate = false -%}
+{%- assign is_restricted_product = false -%}
+
+{%- if request.page_type == 'product' -%}
+  {%- if product.tags contains restricted_tag -%}
+    {%- assign show_gate = true -%}
+    {%- assign is_restricted_product = true -%}
+  {%- endif -%}
+{%- elsif request.page_type == 'cart' -%}
+  {%- for item in cart.items -%}
+    {%- if item.product.tags contains restricted_tag -%}
+      {%- assign show_gate = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+{%- if show_gate -%}
+  <div id="age-guard-overlay" style="display:flex; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:2147483647; justify-content:center; align-items:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <div id="age-guard-modal" style="background:#fff; border-radius:12px; max-width:520px; width:90%; padding:32px; box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center; margin:20px;">
+      <h2 id="age-guard-title" style="margin:0 0 16px; font-size:22px; font-weight:700; color:#202223;">{{ popup_title }}</h2>
+      <p id="age-guard-message" style="margin:0 0 28px; font-size:15px; line-height:1.5; color:#202223;">{{ popup_message }}</p>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <button id="age-guard-confirm" type="button" style="padding:12px 24px; border-radius:8px; border:none; background:#008060; color:#fff; font-size:15px; font-weight:600; cursor:pointer;">{{ confirm_text }}</button>
+        <button id="age-guard-deny" type="button" style="padding:12px 24px; border-radius:8px; border:1px solid #c9cccf; background:#fff; color:#202223; font-size:15px; font-weight:600; cursor:pointer;">{{ deny_text }}</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var storageKey = 'ageGuardVerified_age-restricted_{{ min_age }}';
+      var overlay = document.getElementById('age-guard-overlay');
+      var isRestrictedProduct = {{ is_restricted_product | json }};
+
+      function isVerified() {
+        try {
+          return localStorage.getItem(storageKey) === 'true';
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function setVerified() {
+        try {
+          localStorage.setItem(storageKey, 'true');
+        } catch (e) {}
+      }
+
+      function hideGate() {
+        if (overlay) overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+
+      // Hide Shopify dynamic checkout buttons (Buy it now, Shop Pay, Apple Pay, etc.)
+      // on restricted products only. These render asynchronously, so we use both an
+      // immediate pass and a MutationObserver to catch them when they appear.
+      var HIDDEN_LABEL = 'data-age-guard-hidden';
+      var SELECTORS = [
+        'shopify-accelerated-checkout',
+        '.shopify-payment-button',
+        '.shopify-payment-button__button',
+        '.shopify-payment-button__more-options',
+        '[data-testid="BuyNowButton"]',
+        '.buy-button'
+      ].join(',');
+
+      function hideBuyNow(root) {
+        if (!isRestrictedProduct) return;
+        var scope = root || document;
+        try {
+          var nodes = scope.querySelectorAll(SELECTORS);
+          for (var i = 0; i < nodes.length; i++) {
+            var el = nodes[i];
+            if (!el.hasAttribute(HIDDEN_LABEL)) {
+              el.style.setProperty('display', 'none', 'important');
+              el.setAttribute(HIDDEN_LABEL, 'true');
+            }
+          }
+        } catch (e) {}
+      }
+
+      function showInfoMessage() {
+        if (!isRestrictedProduct) return;
+        if (document.getElementById('age-guard-buy-now-info')) return;
+        var btn = document.querySelector('.shopify-payment-button, shopify-accelerated-checkout');
+        if (!btn) return;
+        var parent = btn.parentElement;
+        if (!parent) return;
+        var info = document.createElement('div');
+        info.id = 'age-guard-buy-now-info';
+        info.setAttribute('role', 'note');
+        info.style.cssText = 'padding:10px 14px; margin-top:8px; background:#f6f6f7; border:1px solid #c9cccf; border-radius:6px; color:#202223; font-size:13px; line-height:1.5; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;';
+        info.textContent = {{ info_message | json }};
+        parent.appendChild(info);
+      }
+
+      function applyBuyNowFix() {
+        hideBuyNow(document);
+        showInfoMessage();
+      }
+
+      // Restore Buy it now buttons after the customer verifies their age.
+      function unhideBuyNow() {
+        if (!isRestrictedProduct) return;
+        try {
+          var hidden = document.querySelectorAll('[' + HIDDEN_LABEL + '="true"]');
+          for (var i = 0; i < hidden.length; i++) {
+            var el = hidden[i];
+            el.style.removeProperty('display');
+            el.removeAttribute(HIDDEN_LABEL);
+          }
+        } catch (e) {}
+        // Remove the info message box
+        var info = document.getElementById('age-guard-buy-now-info');
+        if (info) info.remove();
+      }
+
+      function init() {
+        // If the customer has already verified their age, show everything normally.
+        // Don't hide Buy it now — they can use it freely.
+        if (isVerified()) {
+          hideGate();
+          return;
+        }
+
+        // Customer is NOT verified — hide Buy it now and show info message.
+        applyBuyNowFix();
+
+        // Shopify renders accelerated checkout buttons after page load, so watch for them.
+        var observer = new MutationObserver(function (mutations) {
+          for (var i = 0; i < mutations.length; i++) {
+            var added = mutations[i].addedNodes;
+            for (var j = 0; j < added.length; j++) {
+              var node = added[j];
+              if (node.nodeType === 1) {
+                hideBuyNow(node);
+                if (node.matches && node.matches(SELECTORS)) {
+                  showInfoMessage();
+                }
+              }
+            }
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        // Stop watching after 30s to avoid running forever.
+        setTimeout(function () { observer.disconnect(); }, 30000);
+
+        // Show the age gate popup
+        document.body.style.overflow = 'hidden';
+
+        var confirmBtn = document.getElementById('age-guard-confirm');
+        var denyBtn = document.getElementById('age-guard-deny');
+
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', function () {
+            setVerified();
+            // Stop the MutationObserver — no more hiding needed
+            observer.disconnect();
+            // Restore Buy it now buttons now that the customer is verified
+            unhideBuyNow();
+            hideGate();
+          });
+        }
+
+        if (denyBtn) {
+          denyBtn.addEventListener('click', function () {
+            window.location.href = '/';
+          });
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:ageGate.name",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "restricted_tag",
+      "label": "t:ageGate.restricted_tag.label",
+      "default": "age-restricted"
+    },
+    {
+      "type": "number",
+      "id": "minimum_age",
+      "label": "t:ageGate.minimum_age.label",
+      "default": 21
+    },
+    {
+      "type": "text",
+      "id": "popup_title",
+      "label": "t:ageGate.popup_title.label",
+      "default": "Age Verification Required"
+    },
+    {
+      "type": "textarea",
+      "id": "popup_message",
+      "label": "t:ageGate.popup_message.label",
+      "default": "You must be 21 or older to purchase age-restricted products. Please confirm your age to continue."
+    },
+    {
+      "type": "text",
+      "id": "confirm_text",
+      "label": "t:ageGate.confirm_text.label",
+      "default": "I am 21 or older"
+    },
+    {
+      "type": "text",
+      "id": "deny_text",
+      "label": "t:ageGate.deny_text.label",
+      "default": "I am under 21"
+    },
+    {
+      "type": "text",
+      "id": "info_message",
+      "label": "Buy it now replacement message",
+      "default": "Please verify your age above to enable checkout for this product."
+    }
+  ]
+}
+{% endschema %}
