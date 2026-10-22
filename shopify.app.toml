@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "27fc419b9f2c47f61dbc8522e8370c06"
-application_url = "https://url-listing-nitrogen-offshore.trycloudflare.com"
+application_url = "https://age-guard-age-gate.onrender.com"
 embedded = true
 name = "Age Guard: Age Gate"
 
@@ -61,7 +61,7 @@ api_version = "2027-01"
   compliance_topics = [ "shop/redact" ]
 
 [auth]
-redirect_urls = [ "https://url-listing-nitrogen-offshore.trycloudflare.com/auth/callback" ]
+redirect_urls = [ "https://age-guard-age-gate.onrender.com/auth/callback" ]
 
 [build]
 automatically_update_urls_on_dev = true
